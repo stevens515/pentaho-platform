@@ -1,0 +1,303 @@
+/*! ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2024 - 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************/
+
+
+
+package org.pentaho.platform.plugin.services.importexport;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.concurrent.atomic.AtomicReference;
+
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.glassfish.jersey.media.multipart.FormDataMultiPart;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+import org.apache.commons.cli.UnrecognizedOptionException;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.junit.runners.MethodSorters;
+import org.junit.BeforeClass;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.Assert;
+import org.junit.FixMethodOrder;
+
+import org.mockito.MockedStatic;
+import org.pentaho.platform.engine.core.output.MultiOutputStream;
+import org.pentaho.platform.plugin.services.importexport.CommandLineProcessor.RequestType;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.nullable;
+import static org.mockito.Mockito.when;
+
+
+@FixMethodOrder( MethodSorters.NAME_ASCENDING )
+public class CommandLineProcessorTest extends Assert {
+
+  private static final PrintStream CONSOLE_OUT = System.out;
+  private static final ByteArrayOutputStream CONSOLE_BUFFER = new ByteArrayOutputStream();
+  private static boolean brokenConstructor = false;
+
+  private static final String[] ARGS_INVALID = {
+    "--import",
+    "--url=http://localhost:8080/pentaho",
+    "--username=admin",
+    "--password=password",
+    "-charset=UTF-8",
+    "--path=/home/admin/2w",
+    "--file-path=D:/test.zip",
+    "--overwrite=true",
+    "--retainOwnership=true",
+    "--permission=false"
+  };
+
+  @BeforeClass
+  public static void setUp() throws Exception {
+    OutputStream multiOut = new MultiOutputStream( new OutputStream[] { CONSOLE_BUFFER, CONSOLE_OUT } );
+
+    PrintStream ps = new PrintStream( multiOut );
+    System.setOut( ps );
+  }
+
+  @AfterClass
+  public static void tearDown() throws Exception {
+    System.setOut( CONSOLE_OUT );
+  }
+
+  @Before
+  public void before() {
+    CONSOLE_BUFFER.reset();
+  }
+
+  private void testRequestType( String keyKey, String nameKey, RequestType rt ) throws ParseException {
+    CommandLineProcessor clp = createCommandLineProcessor( keyKey, nameKey );
+    assertEquals( rt, clp.getRequestType() );
+  }
+
+  private CommandLineProcessor createCommandLineProcessor( String keyKey, String nameKey ) throws ParseException {
+    return new CommandLineProcessor( new String[] { getOption( "-", keyKey ), getOption( "--", nameKey ) } );
+  }
+
+  private String getOption( String key ) {
+    return getOption( "", key );
+  }
+
+  private String getOption( String prefix, String key ) {
+    if ( key == null ) {
+      return "";
+    }
+    return prefix + key;
+  }
+
+  @Test
+  public void get001ConstructorTest() throws ParseException {
+    try {
+      testRequestType( "h", null, RequestType.HELP );
+      testRequestType( "rest", null, RequestType.REST );
+      testRequestType( "backup", null, RequestType.BACKUP );
+      testRequestType( "restore", null, RequestType.RESTORE );
+      testRequestType( "i", null, RequestType.IMPORT );
+      testRequestType( "e", null, RequestType.EXPORT );
+
+      testRequestType( null, "help", RequestType.HELP );
+      testRequestType( null, "rest", RequestType.REST );
+      testRequestType( null, "backup", RequestType.BACKUP );
+      testRequestType( null, "restore", RequestType.RESTORE );
+      testRequestType( null, "import", RequestType.IMPORT );
+      testRequestType( null, "export", RequestType.EXPORT );
+
+      try {
+        createCommandLineProcessor( null, null );
+        fail();
+      } catch ( ParseException e ) {
+        // expected
+      }
+
+    } catch ( Exception e ) {
+      brokenConstructor = true;
+      throw e;
+    }
+  }
+
+  private static void depensOnConstructor() {
+    if ( brokenConstructor ) {
+      throw new RuntimeException( "Constructor 'CommandLineProcessor' broken" );
+    }
+  }
+
+  @Test
+  public void get002PrintHelpTest() throws IllegalAccessException {
+    CommandLineProcessor.printHelp();
+
+    String help = CONSOLE_BUFFER.toString();
+
+    Options options = (Options) FieldUtils.readDeclaredStaticField( CommandLineProcessor.class, "options", true );
+    @SuppressWarnings( "unchecked" )
+    Collection<Option> optionCollection = options.getOptions();
+    for ( Option option : optionCollection ) {
+      if ( !help.contains( "-" + option.getOpt() ) ) {
+        fail();
+      }
+    }
+  }
+
+  @Test
+  public void get003WriteFiletest() throws Exception {
+    String exception = "Throw exception on purpose to test the writeFile() method.";
+
+    try ( MockedStatic<ClientBuilder> clientMock = mockStatic( ClientBuilder.class ) ) {
+      Client mockClient = mock( Client.class );
+      WebTarget mockWebTarget = mock( WebTarget.class );
+      when( mockWebTarget.request( any( MediaType.class ) ) ).thenThrow( new RuntimeException( exception ) );
+      when( mockClient.target( nullable( String.class ) ) ).thenReturn( mockWebTarget );
+      clientMock.when( () -> ClientBuilder.newClient( any() ) ).thenReturn( mockClient );
+
+      File file = File.createTempFile( "CommandLineProcessorTest", ".log" );
+
+      String[] unknownHostUrl = {
+        "--import",
+        "--url=http://test/pentaho",
+        "--username=admin",
+        "--password=password",
+        "--path=/test/test/test",
+        "--file-path=" + file.getAbsolutePath(),
+        "--logfile=" + file.getAbsolutePath()};
+
+      //When an unknown host URL is used with an import, the private method writeFile() is called.
+      CommandLineProcessor.main( unknownHostUrl );
+      try {
+        assertEquals( exception, FileUtils.readFileToString( file, StandardCharsets.UTF_8 ) );
+      } finally {
+        file.delete();
+      }
+      assertTrue( CONSOLE_BUFFER.toString().contains( exception ) );
+    }
+  }
+
+  @Test
+  public void importSendsConfiguredLogLevel() throws Exception {
+    try ( MockedStatic<ClientBuilder> clientMock = mockStatic( ClientBuilder.class ) ) {
+      Client mockClient = mock( Client.class );
+      WebTarget mockWebTarget = mock( WebTarget.class );
+      Invocation.Builder mockRequest = mock( Invocation.Builder.class );
+      Response mockResponse = mock( Response.class );
+      AtomicReference<String> requestLogLevel = new AtomicReference<>();
+      when( mockClient.target( nullable( String.class ) ) ).thenReturn( mockWebTarget );
+      when( mockWebTarget.request( any( MediaType.class ) ) ).thenReturn( mockRequest );
+      when( mockRequest.accept( MediaType.TEXT_HTML_TYPE ) ).thenReturn( mockRequest );
+      when( mockRequest.post( any( Entity.class ) ) ).thenAnswer( invocation -> {
+        Entity entity = invocation.getArgument( 0 );
+        FormDataMultiPart multipart = (FormDataMultiPart) entity.getEntity();
+        requestLogLevel.set( multipart.getField( "logLevel" ).getValue() );
+        return mockResponse;
+      } );
+      when( mockResponse.getStatus() ).thenReturn( Response.Status.OK.getStatusCode() );
+      when( mockResponse.hasEntity() ).thenReturn( false );
+      clientMock.when( () -> ClientBuilder.newClient( any() ) ).thenReturn( mockClient );
+
+      File file = File.createTempFile( "CommandLineProcessorTest", ".zip" );
+      try {
+        CommandLineProcessor.main( new String[] {
+          "--import",
+          "--url=http://test/pentaho",
+          "--username=admin",
+          "--password=password",
+          "--path=/test",
+          "--file-path=" + file.getAbsolutePath(),
+          "--logLevel=DEBUG"
+        } );
+
+        assertEquals( "DEBUG", requestLogLevel.get() );
+      } finally {
+        file.delete();
+      }
+    }
+  }
+
+  @Test
+  public void get004GetOptionValueTest() throws ParseException {
+    depensOnConstructor();
+
+    String requestType = getOption( "-", "i" );
+    String shortOption = getOption( "u" );
+    String longOption = getOption( "username" );
+
+    CommandLineProcessor clp = new CommandLineProcessor( new String[] { requestType, "-" + shortOption + "=value" } );
+    assertEquals( "value", clp.getOptionValue( shortOption, false, true ) );
+    assertEquals( "value", clp.getOptionValue( longOption, false, true ) );
+    assertNull( clp.getOptionValue( "wrongKey", false, true ) );
+    try {
+      assertNull( clp.getOptionValue( "wrongKey", true, true ) );
+      fail();
+    } catch ( ParseException e ) {
+      // expected
+    }
+
+    try {
+      assertNull( clp.getOptionValue( "wrongKey", false, false ) );
+      fail();
+    } catch ( ParseException e ) {
+      // expected
+    }
+
+    assertEquals( "value", clp.getOptionValue( longOption, false, true ) );
+    assertNull( clp.getOptionValue( "wrongKey", false, true ) );
+    try {
+      assertNull( clp.getOptionValue( "wrongKey", true, true ) );
+      fail();
+    } catch ( ParseException e ) {
+      // expected
+    }
+
+    try {
+      assertNull( clp.getOptionValue( "wrongKey", false, false ) );
+      fail();
+    } catch ( ParseException e ) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testInvalidCharset() throws Exception {
+    CommandLineProcessor.main( ARGS_INVALID );
+    Assert.assertEquals( IllegalArgumentException.class, CommandLineProcessor.getException().getClass() );
+  }
+
+  @Test
+  public void testInvalidArgument1() throws Exception {
+    String[] invalid = { "--import", "--foo=wibble" };
+    CommandLineProcessor.main( invalid );
+    Assert.assertEquals( UnrecognizedOptionException.class, CommandLineProcessor.getException().getClass() );
+  }
+
+  @Test
+  public void testInvalidArgument2() throws Exception {
+    String[] invalid = { "--import", "-boo=foo" };
+    CommandLineProcessor.main( invalid );
+    Assert.assertEquals( UnrecognizedOptionException.class, CommandLineProcessor.getException().getClass() );
+  }
+}

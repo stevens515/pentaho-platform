@@ -1,0 +1,42 @@
+/*! ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2024 - 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************/
+
+
+
+package org.pentaho.platform.api.engine.security.userroledao;
+
+import org.junit.jupiter.api.Test;
+import java.lang.reflect.Constructor;
+
+import static org.junit.jupiter.api.Assertions.fail;
+
+public class AlreadyExistsExceptionTest {
+
+  @Test
+  public void test() {
+    try {
+      Constructor<AlreadyExistsException> constructor = AlreadyExistsException.class.getDeclaredConstructor( String.class, Throwable.class );
+      constructor.setAccessible( true );
+      constructor.newInstance( "msg", new Exception( "cause" ) );
+    } catch ( Exception e ) {
+      fail( AlreadyExistsException.class.getSimpleName() + " Does not have a constructor with String, Throwable " );
+    }
+
+    try {
+      Constructor<AlreadyExistsException> constructor = AlreadyExistsException.class.getDeclaredConstructor( String.class );
+      constructor.setAccessible( true );
+      constructor.newInstance( "msg" );
+    } catch ( Exception e ) {
+      fail( AlreadyExistsException.class.getSimpleName() + " Does not have a constructor with String " );
+    }
+  }
+}

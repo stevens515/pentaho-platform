@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************* -->
+<themes root-folder="themes">
+  <onyx>
+    <file>mantleOnyx.css</file>
+  </onyx>
+  <slate>
+    <file>mantleSlate.css</file>
+  </slate>
+  <crystal>
+    <file>mantleCrystal.css</file>
+  </crystal>
+  <sapphire>
+    <file>mantleSapphire.css</file>
+  </sapphire>
+  <ruby>
+    <file>mantleRuby.css</file>
+  </ruby>
+</themes>

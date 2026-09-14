@@ -1,0 +1,18 @@
+<!-- ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************* -->
+<layouts>
+    <layout>
+        <name>Pentaho</name>
+        <uri>/layouts/pentaho-layout.jsp</uri>
+        <uri state="maximized">/layouts/pentaho-layout.jsp</uri>
+    </layout>
+</layouts>

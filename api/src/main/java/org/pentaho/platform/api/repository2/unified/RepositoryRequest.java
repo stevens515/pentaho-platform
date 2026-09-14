@@ -1,0 +1,268 @@
+/*! ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2024 - 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************/
+
+
+
+package org.pentaho.platform.api.repository2.unified;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+
+public class RepositoryRequest {
+  private static final Pattern FILES_TYPES_PATTERN = FILES_TYPE_FILTER.getRegExPattern();
+
+  private static final Pattern FILES_MEMBERS_INCLUDE_PATTERN = Pattern.compile( "includeMembers=(.+)" );
+  private static final Pattern FILES_MEMBERS_EXCLUDE_PATTERN = Pattern.compile( "excludeMembers=(.+)" );
+  public static final String PATH_SEPARATOR = "/";
+
+  /**
+   * separates the parts of the legacy filter, e.g. <code>*.ktr|FILES_FOLDERS</code>, and the terms of a child node
+   * filter disjunction
+   */
+  public static final String FILTER_SEPARATOR = "|";
+
+  /**
+   * the wildcard accepted inside a node name filter; a filter made of this single character means "everything"
+   */
+  public static final String FILTER_WILDCARD = "*";
+
+  private static final Pattern FILTER_SEPARATOR_PATTERN = Pattern.compile( Pattern.quote( FILTER_SEPARATOR ) );
+
+  private String path;
+  private boolean showHidden = false;
+  private boolean includeAcls = false;
+  private boolean includeSystemFolders = true; // default: PDI uses this web-service and system folders must be returned to admin repository database connections.
+  private Integer depth = -1;
+  private FILES_TYPE_FILTER types = FILES_TYPE_FILTER.FILES_FOLDERS;
+  private Set<String> includeMemberSet = null;
+  private Set<String> excludeMemberSet = null;
+
+  private transient String workingFilter; // temporary storage of remaining filter text as it is parsed.
+  private String childNodeFilter;
+
+  /**
+   * This class encapsulates the parameters received by the "children" and "tree" REST calls. It provides default values
+   * for parameters not specified and breaks down the legacy "filter" parameters into it's component parts.
+   */
+  public RepositoryRequest() {
+  }
+
+  public RepositoryRequest( String path, Boolean showHidden, Integer depth, String legacyFilter ) {
+    this.path = path;
+    this.showHidden = showHidden == null ? false : showHidden;
+    setDepth( depth );
+    setLegacyFilter( legacyFilter );
+  }
+
+  /**
+   * Strips out and sets the file types portion of the legacyFilter
+   */
+  private void parseOutFileTypes() {
+    // Check for File type filter
+    types = FILES_TYPE_FILTER.FILES_FOLDERS;
+    StringBuilder strippedFilter = new StringBuilder();
+    if ( !workingFilter.isEmpty() ) {
+      String[] parts = FILTER_SEPARATOR_PATTERN.split( workingFilter );
+      for ( String part : parts ) {
+        Matcher m = FILES_TYPES_PATTERN.matcher( part );
+        if ( m.matches() ) {
+          FILES_TYPE_FILTER newType = FILES_TYPE_FILTER.valueOf( m.group( 1 ) );
+          if ( newType != null ) {
+            types = newType;
+            // note it only makes sense to have FILES if the depth is 1
+            if ( types == FILES_TYPE_FILTER.FILES && depth != 1 ) {
+              types = FILES_TYPE_FILTER.FILES_FOLDERS;
+            }
+          }
+        } else {
+          appendFilter( strippedFilter, part );
+        }
+      }
+    }
+    workingFilter = strippedFilter.toString();
+  }
+
+  private void appendFilter( StringBuilder strippedFilter, String part ) {
+    if ( strippedFilter.length() != 0 ) {
+      strippedFilter.append( FILTER_SEPARATOR );
+    }
+    strippedFilter.append( part );
+  }
+
+  /**
+   * Strips out and sets the include/exclude member sets from the filter
+   */
+  private void parseOutIncludeExclude() {
+    includeMemberSet = parseOutPattern( FILES_MEMBERS_INCLUDE_PATTERN );
+    excludeMemberSet = parseOutPattern( FILES_MEMBERS_EXCLUDE_PATTERN );
+    if ( ( includeMemberSet != null && !includeMemberSet.isEmpty() )
+        && ( excludeMemberSet != null && !excludeMemberSet.isEmpty() ) ) {
+      throw new RuntimeException( "Cannot include and exclude values in the same Legacy Filter" );
+    }
+  }
+
+  private Set<String> parseOutPattern( Pattern pattern ) {
+    StringBuilder strippedFilter = new StringBuilder();
+    String[] parts = FILTER_SEPARATOR_PATTERN.split( workingFilter );
+    Set<String> memberSet = null;
+
+    for ( String part : parts ) {
+      Matcher m = pattern.matcher( part );
+      if ( m.matches() ) {
+        String includeMembersStr = m.group( 1 );
+        memberSet = new HashSet<String>( Arrays.asList( includeMembersStr.split( "," ) ) );
+      } else {
+        appendFilter( strippedFilter, part );
+      }
+    }
+    workingFilter = strippedFilter.toString();
+    return memberSet;
+  }
+
+  public enum FILES_TYPE_FILTER {
+    FILES, FOLDERS, FILES_FOLDERS;
+
+    public static Pattern getRegExPattern() {
+      StringBuilder sb = new StringBuilder( "(PLACEHOLDER" );
+      for ( FILES_TYPE_FILTER val : FILES_TYPE_FILTER.values() ) {
+        sb.append( "|" ).append( val.toString() );
+      }
+      sb.append( ")" );
+      return Pattern.compile( sb.toString() );
+    }
+  }
+
+  private void setLegacyFilter( String legacyFilter ) {
+    this.workingFilter =
+      ( legacyFilter == null || StringUtils.isEmpty( legacyFilter ) ) ? FILTER_WILDCARD : legacyFilter;
+    parseOutFileTypes();
+    parseOutIncludeExclude();
+    childNodeFilter = workingFilter.isEmpty() ? null : workingFilter;
+    workingFilter = null; //garbage collect
+  }
+
+  public FILES_TYPE_FILTER getTypes() {
+    return types;
+  }
+
+  /**
+   * Sets whether files, folders, or both are returned: ( FILES | FOLDERS | [default] FILES_FOLDERS )
+   */
+  public void setTypes( FILES_TYPE_FILTER types ) {
+    this.types = types;
+  }
+
+  public Set<String> getIncludeMemberSet() {
+    return includeMemberSet;
+  }
+
+  /**
+   * @param includeMemberSet A set of field names to be included in the output.
+   */
+  public void setIncludeMemberSet( Set<String> includeMemberSet ) {
+    this.includeMemberSet = includeMemberSet;
+  }
+
+  public Set<String> getExcludeMemberSet() {
+    return excludeMemberSet;
+  }
+
+  /**
+   * @param includeMemberSet A set of field names to be excluded in the output.
+   */
+  public void setExcludeMemberSet( Set<String> excludeMemberSet ) {
+    this.excludeMemberSet = excludeMemberSet;
+  }
+
+  public boolean isShowHidden() {
+    return showHidden;
+  }
+
+  public boolean isIncludeSystemFolders() {
+    return includeSystemFolders;
+  }
+
+  public void setIncludeSystemFolders( boolean includeSystemFolders ) {
+    this.includeSystemFolders = includeSystemFolders;
+  }
+
+  /**
+   * @param showHidden
+   *      Whether to return information about hidden files.  Default is false.
+   */
+  public void setShowHidden( boolean showHidden ) {
+    this.showHidden = showHidden;
+  }
+
+  public Integer getDepth() {
+    return depth;
+  }
+
+  /**
+   * @param depth
+   *          0 fetches just file at path; positive integer n fetches node at path plus n levels of children; negative
+   *          integer fetches all children. If n > 0 and {@link RepositoryRequest#setTypes(FILES_TYPE_FILTER)} is set to
+   *          FILES then only the top level children will be processed.
+   */
+  public void setDepth( Integer depth ) {
+    if ( depth == null ) {
+      depth = -1; // search all
+    }
+    this.depth = depth;
+  }
+
+  public String getChildNodeFilter() {
+    return childNodeFilter;
+  }
+
+  /**
+   * @param childNodefilter
+   *          filter may be a full name or a partial name with one or more wildcard characters
+   *          ("{@value #FILTER_WILDCARD}"), or a disjunction
+   *          (using the "{@value #FILTER_SEPARATOR}" character to represent logical OR) of these; filter does not
+   *          apply to root node.
+   */
+  public void setChildNodeFilter( String childNodeFilter ) {
+    this.childNodeFilter = childNodeFilter;
+  }
+
+  public String getPath() {
+    return path;
+  }
+
+  /**
+   * @param path
+   *         Path to file
+   */
+  public void setPath( String path ) {
+    this.path = path;
+  }
+
+  public boolean isIncludeAcls() {
+    return includeAcls;
+  }
+
+  /**
+   *
+   * @param includeAcls
+   *     Set to true to return ACL permission information with the output.  Default is false.
+   */
+  public void setIncludeAcls( boolean includeAcls ) {
+    this.includeAcls = includeAcls;
+  }
+
+}

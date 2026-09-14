@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************* -->
+<action-sequence> 
+  <title>Test SQL Execute 2</title>
+  <version>1</version>
+  <logging-level>DEBUG</logging-level>
+  <documentation> 
+    <author>Marc Batchelor</author>  
+    <description>This tests the SQL Execute rule to make sure that multiple-statements work.</description>  
+    <help/>  
+    <result-type>rule</result-type>  
+    <icon/> 
+  </documentation>
+
+  <inputs/>
+
+	<outputs>
+		<rule-result>
+			<type>list</type>
+		</rule-result>
+	</outputs>
+
+  <resources/>
+  
+  <actions>
+      <action-definition>
+
+        <action-outputs>
+          <rule-result type="list"/>
+        </action-outputs>
+        
+        <component-name>SQLExecute</component-name>
+        <action-type>rule</action-type>
+      	<component-definition>
+          <jndi>SampleDataAdmin</jndi>
+          <continue_on_exception>true</continue_on_exception>
+          <query><![CDATA[
+            drop table foo;
+            create table foo (bar int);
+            insert into foo values (1);
+            delete from foo;
+            drop table foo
+          ]]></query>
+        </component-definition>
+      </action-definition>
+  </actions> 
+</action-sequence>

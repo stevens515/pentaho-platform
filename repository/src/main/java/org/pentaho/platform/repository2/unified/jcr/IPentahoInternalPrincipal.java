@@ -1,0 +1,27 @@
+/*! ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2024 - 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************/
+
+
+
+package org.pentaho.platform.repository2.unified.jcr;
+
+import java.security.Principal;
+import java.util.Enumeration;
+
+/**
+ * Marker interface that denotes principals that are part of internal ACEs that are never exposed to clients.
+ * 
+ * @author mlowery
+ */
+public interface IPentahoInternalPrincipal extends Principal {
+
+}

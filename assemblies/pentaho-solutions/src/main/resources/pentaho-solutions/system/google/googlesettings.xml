@@ -1,0 +1,17 @@
+<!-- ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************* -->
+<google>
+
+	<!-- this key is for localhost:8080 only -->
+	<google_maps_api_key>ABQIAAAAoGNlMo4FkTb3mcC5mj5ERRTwM0brOpm-All5BF6PoaKBxRWWERR0378zH4HL9GyjgMMHJmj_viP4PQ</google_maps_api_key>
+		
+</google>

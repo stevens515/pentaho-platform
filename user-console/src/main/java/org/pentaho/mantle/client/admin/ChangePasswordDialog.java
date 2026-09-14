@@ -1,0 +1,223 @@
+/*! ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2024 - 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************/
+
+
+
+package org.pentaho.mantle.client.admin;
+
+import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.event.dom.client.ClickHandler;
+import com.google.gwt.event.dom.client.KeyUpEvent;
+import com.google.gwt.event.dom.client.KeyUpHandler;
+import com.google.gwt.regexp.shared.RegExp;
+import com.google.gwt.user.client.ui.Button;
+import com.google.gwt.user.client.ui.HorizontalPanel;
+import com.google.gwt.user.client.ui.Label;
+import com.google.gwt.user.client.ui.Panel;
+import com.google.gwt.user.client.ui.PasswordTextBox;
+import com.google.gwt.user.client.ui.SimplePanel;
+import com.google.gwt.user.client.ui.VerticalPanel;
+import org.pentaho.gwt.widgets.client.dialogs.DialogBox;
+import org.pentaho.gwt.widgets.client.panel.HorizontalFlexPanel;
+import org.pentaho.gwt.widgets.client.panel.VerticalFlexPanel;
+import org.pentaho.gwt.widgets.client.utils.string.StringUtils;
+import org.pentaho.mantle.client.messages.Messages;
+import org.pentaho.ui.xul.gwt.tags.GwtDialog;
+import org.pentaho.ui.xul.gwt.tags.GwtMessageBox;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class ChangePasswordDialog extends GwtDialog implements ServiceCallback {
+
+  private UpdatePasswordController controller;
+  private PasswordTextBox newPasswordTextBox;
+  private PasswordTextBox reTypePasswordTextBox;
+  private PasswordTextBox administratorPasswordTextBox;
+  private Button acceptBtn = new Button( Messages.getString( "ok" ) );
+  private Button cancelBtn = new Button( Messages.getString( "cancel" ) );
+  private boolean acceptBtnEnabled = false;
+  private static final String ALLOWED_CHARS = "^[a-zA-Z0-9_.,:;<>|!@#$%^&*()\\[\\]-]+$";
+  private static final RegExp ALLOWED_CHARS_REGEXP = RegExp.compile( ALLOWED_CHARS );
+  private static final String ALLOWED_CHARS_LIST = "a-z A-Z 0-9 _ . , : ; < > | ! @ # $ % ^ & * ( ) [ ] -";
+
+  public ChangePasswordDialog( UpdatePasswordController controller ) {
+    setWidth( 260 );
+    setHeight( 240 );
+    getButtonPanel();
+    setTitle( Messages.getString( "changePassword" ) );
+
+    disableAcceptBtn();
+    newPasswordTextBox = new PasswordTextBox();
+    newPasswordTextBox.setWidth( "260px" );
+    reTypePasswordTextBox = new PasswordTextBox();
+    reTypePasswordTextBox.setWidth( "260px" );
+    administratorPasswordTextBox = new PasswordTextBox();
+    administratorPasswordTextBox.setWidth( "260px" );
+
+    TextBoxValueChangeHandler textBoxChangeHandler = new TextBoxValueChangeHandler();
+    newPasswordTextBox.addKeyUpHandler( textBoxChangeHandler );
+    reTypePasswordTextBox.addKeyUpHandler( textBoxChangeHandler );
+    administratorPasswordTextBox.addKeyUpHandler( textBoxChangeHandler );
+
+    acceptBtn.setStylePrimaryName( "pentaho-button" );
+    acceptBtn.addClickHandler( new AcceptListener() );
+    cancelBtn.setStylePrimaryName( "pentaho-button" );
+    cancelBtn.addClickHandler( new CancelListener() );
+
+    setResponsive( true );
+    setWidthCategory( WidthCategory.EXTRASMALL );
+
+    this.controller = controller;
+  }
+
+  @Override
+  protected DialogBox createManagedDialog() {
+    DialogBox dialog = super.createManagedDialog();
+    dialog.setStyleDependentName( "change-password", true );
+
+    return dialog;
+  }
+
+  public Panel getButtonPanel() {
+    HorizontalPanel hp = new HorizontalFlexPanel();
+    hp.add( acceptBtn );
+    hp.setCellWidth( acceptBtn, "100%" );
+    hp.setCellHorizontalAlignment( acceptBtn, HorizontalPanel.ALIGN_RIGHT );
+    hp.add( cancelBtn );
+    return hp;
+  }
+
+  public Panel getDialogContents() {
+
+    VerticalPanel vp = new VerticalFlexPanel();
+
+    Label nameLabel = new Label( Messages.getString( "newPassword" ) + ":" );
+    newPasswordTextBox.setTitle( nameLabel.getText() );
+    vp.add( nameLabel );
+    vp.add( newPasswordTextBox );
+
+    SimplePanel separatorSpacer = new SimplePanel();
+    separatorSpacer.setStylePrimaryName( "spacer" );
+    vp.add( separatorSpacer );
+
+    Label passwordLabel = new Label( Messages.getString( "retypePassword" ) + ":" );
+    reTypePasswordTextBox.setTitle( passwordLabel.getText() );
+    vp.add( passwordLabel );
+    vp.add( reTypePasswordTextBox );
+
+    separatorSpacer = new SimplePanel();
+    separatorSpacer.setStylePrimaryName( "spacer" );
+    vp.add( separatorSpacer );
+
+    separatorSpacer = new SimplePanel();
+    separatorSpacer.setStylePrimaryName( "spacer" );
+    separatorSpacer.addStyleDependentName( "border-top" );
+    vp.add( separatorSpacer );
+
+    Label administratorLabel = new Label( Messages.getString( "administratorPassword" ) + ":" );
+    administratorPasswordTextBox.setTitle( administratorLabel.getText() );
+    vp.add( administratorLabel );
+    vp.add( administratorPasswordTextBox );
+
+    return vp;
+  }
+  @Override
+  public void serviceResult( boolean ok ) {
+    if ( ok ) {
+      this.hide();
+    } else {
+      newPasswordTextBox.setText( "" );
+      reTypePasswordTextBox.setText( "" );
+      administratorPasswordTextBox.setText( "" );
+
+      cancelBtn.setEnabled( true );
+    }
+  }
+
+  private void enableAcceptBtn() {
+    acceptBtn.removeStyleName( "disabled" );
+    acceptBtnEnabled = true;
+  }
+
+  private void disableAcceptBtn() {
+    acceptBtn.addStyleName( "disabled" );
+    acceptBtnEnabled = false;
+  }
+
+  class AcceptListener implements ClickHandler {
+    public void onClick( ClickEvent event ) {
+      if ( acceptBtnEnabled ) {
+        disableAcceptBtn();
+        String newPassword = newPasswordTextBox.getText();
+        String administratorPassword = administratorPasswordTextBox.getText();
+
+        if ( !isValidPassword( newPassword ) ) {
+          String nonMatchingChars = getNonMatchingCharacters( newPassword, ALLOWED_CHARS );
+          showErrorMessage( nonMatchingChars, ALLOWED_CHARS_LIST );
+          return;
+        }
+
+        controller.updatePassword( newPassword, administratorPassword, ChangePasswordDialog.this );
+      }
+    }
+
+    private boolean isValidPassword( String password ) {
+      return ALLOWED_CHARS_REGEXP.test( password );
+    }
+
+    private String getNonMatchingCharacters( String value, String allowedCharacters ) {
+      Set<Character> seen = new HashSet<>(); // Allows to identify unique non matching characters
+      StringBuilder nonMatchingChars = new StringBuilder();
+
+      for ( char c : value.toCharArray() ) {
+        if ( !ALLOWED_CHARS_REGEXP.test( String.valueOf( c ) )
+          && seen.add( c ) ) {
+          if (nonMatchingChars.length() > 0) {
+            nonMatchingChars.append(" ");
+          }
+          nonMatchingChars.append( c );
+        }
+      }
+      return nonMatchingChars.toString();
+    }
+
+    private void showErrorMessage( String value, String allowedCharacters ) {
+      GwtMessageBox messageBox = new GwtMessageBox();
+      messageBox.setTitle( Messages.getString( "error" ) );
+      messageBox.setMessage( Messages.getString( "allowedNameCharacters", value, allowedCharacters ) );
+      messageBox.setButtons( new Object[ ACCEPT ] );
+      messageBox.setWidth( 300 );
+      messageBox.show();
+    }
+  }
+
+  class CancelListener implements ClickHandler {
+    public void onClick( ClickEvent event ) {
+      hide();
+    }
+  }
+
+  class TextBoxValueChangeHandler implements KeyUpHandler {
+    public void onKeyUp( KeyUpEvent evt ) {
+      String password = newPasswordTextBox.getText();
+      String reTypePassword = reTypePasswordTextBox.getText();
+      String administratorPassword = administratorPasswordTextBox.getText();
+      boolean isEnabled = !StringUtils.isEmpty( administratorPassword ) && !StringUtils.isEmpty( password ) && password.equals( reTypePassword );
+      if ( isEnabled ) {
+        enableAcceptBtn();
+      } else {
+        disableAcceptBtn();
+      }
+    }
+  }
+}

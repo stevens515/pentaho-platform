@@ -1,7 +1,0 @@
-<layouts>
-    <layout>
-        <name>Pentaho</name>
-        <uri>/layouts/pentaho-layout.jsp</uri>
-        <uri state="maximized">/layouts/pentaho-layout.jsp</uri>
-    </layout>
-</layouts>

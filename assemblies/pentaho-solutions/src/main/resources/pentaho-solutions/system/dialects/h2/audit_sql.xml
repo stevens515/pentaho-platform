@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ******************************************************************************
+ *
+ * Pentaho
+ *
+ * Copyright (C) 2026 by Pentaho Canada Inc. : http://www.pentaho.com
+ *
+ * Use of this software is governed by the Business Source License included
+ * in the LICENSE.TXT file.
+ *
+ * Change Date: 2030-06-15
+ ******************************************************************************* -->
+<audit-sql>
+
+  <auditConnection>
+    <tableName>pro_audit</tableName>
+    <insertSQL>
+    INSERT INTO PRO_AUDIT (JOB_ID, INST_ID, OBJ_ID, OBJ_TYPE, ACTOR, MESSAGE_TYPE, MESSAGE_NAME, MESSAGE_TEXT_VALUE, MESSAGE_NUM_VALUE, DURATION, AUDIT_TIME) values (?,?,?,?,?,?,?,?,?,?,?)
+    </insertSQL>
+    <JNDI>Hibernate</JNDI>
+  </auditConnection>
+
+</audit-sql>
